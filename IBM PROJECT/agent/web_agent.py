@@ -7,8 +7,11 @@ from dotenv import load_dotenv
 # Load environment variables from .env file (for other environment variables if needed)
 load_dotenv()
 
-# API key will be input by user instead of loaded from environment
-# OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+# Initialize session state for authentication
+if 'authenticated' not in st.session_state:
+    st.session_state.authenticated = False
+if 'api_key' not in st.session_state:
+    st.session_state.api_key = ""
 
 tech_stacks = {
     "portfolio website": {
@@ -74,12 +77,6 @@ tech_stacks = {
         "Hosting": "Vercel",
         "Difficulty": "Intermediate"
     }
-
-
-
-
-
-
 }
 
 def find_closest_match(user_input):
@@ -166,68 +163,98 @@ def get_ai_suggestion(prompt: str, api_key: str, return_raw=False) -> str:
     except requests.exceptions.RequestException as e:
         return f"❌ Request error: {str(e)}"
 
-st.title("Orient: TechStack Guide Agent")
-st.subheader("Enter what you want to build:")
-
-# Display available project types in the sidebar
-st.sidebar.title("Available Project Types")
-for project in tech_stacks.keys():
-    st.sidebar.markdown(f"- {project.title()}")
-
-# Add API key input in the sidebar
-st.sidebar.markdown("---")
-st.sidebar.title("API Settings")
-api_key = st.sidebar.text_input("OpenRouter API Key", type="password", help="Enter your OpenRouter API key here. It will not be stored.")
-
-# Add a toggle for raw response
-st.sidebar.markdown("---")
-st.sidebar.title("Display Settings")
-show_raw_response = st.sidebar.checkbox("Show raw API response", False, help="Display the complete JSON response from the API instead of just the content")
-
-query = st.text_input("e.g. portfolio website, chat app (python)")
-
-if query:
-    project_type = query.lower().strip()
-
-    if project_type in tech_stacks:
-        st.success(f"✅ Stack for '{project_type.title()}':")
+# Authentication popup
+def show_auth_popup():
+    with st.container():
+        st.markdown("### Welcome to Orient TechStack Guide")
+        st.markdown("Please enter your OpenRouter API key to continue.")
+        st.markdown("You can get an API key from [OpenRouter](https://openrouter.ai/)")
         
-        # Create a styled table for the tech stack
+        api_key_input = st.text_input("OpenRouter API Key", type="password")
         col1, col2 = st.columns([1, 3])
+        
         with col1:
-            st.markdown("**Component**")
-            for k in tech_stacks[project_type].keys():
-                st.markdown(f"**{k}**")
-        with col2:
-            st.markdown("**Technology**")
-            for v in tech_stacks[project_type].values():
-                st.markdown(f"{v}")
+            if st.button("Continue"):
+                if api_key_input:
+                    st.session_state.api_key = api_key_input
+                    st.session_state.authenticated = True
+                    st.experimental_rerun()
+                else:
+                    st.error("Please enter an API key to continue")
 
-    else:
-        match = find_closest_match(project_type)
-        if match:
-            st.info(f"Showing results for closest match: **{match.title()}**")
+# Main application
+def show_main_app():
+    st.title("Orient: TechStack Guide Agent")
+    st.subheader("Enter what you want to build:")
+
+    # Display available project types in the sidebar
+    st.sidebar.title("Available Project Types")
+    for project in tech_stacks.keys():
+        st.sidebar.markdown(f"- {project.title()}")
+
+    # Add API key display/edit in the sidebar
+    st.sidebar.markdown("---")
+    st.sidebar.title("API Settings")
+    
+    # Show masked API key and option to change
+    masked_key = "*" * 10
+    st.sidebar.text(f"Current API Key: {masked_key}")
+    if st.sidebar.button("Change API Key"):
+        st.session_state.authenticated = False
+        st.experimental_rerun()
+
+    # Add a toggle for raw response
+    st.sidebar.markdown("---")
+    st.sidebar.title("Display Settings")
+    show_raw_response = st.sidebar.checkbox("Show raw API response", False, help="Display the complete JSON response from the API instead of just the content")
+
+    query = st.text_input("e.g. portfolio website, chat app (python)")
+
+    if query:
+        project_type = query.lower().strip()
+
+        if project_type in tech_stacks:
+            st.success(f"✅ Stack for '{project_type.title()}':")
             
             # Create a styled table for the tech stack
             col1, col2 = st.columns([1, 3])
             with col1:
                 st.markdown("**Component**")
-                for k in tech_stacks[match].keys():
+                for k in tech_stacks[project_type].keys():
                     st.markdown(f"**{k}**")
             with col2:
                 st.markdown("**Technology**")
-                for v in tech_stacks[match].values():
+                for v in tech_stacks[project_type].values():
                     st.markdown(f"{v}")
+
         else:
-            st.warning("No predefined match found – asking AI...")
-            if not api_key:
-                st.error("Please enter your OpenRouter API key in the sidebar to use AI suggestions.")
+            match = find_closest_match(project_type)
+            if match:
+                st.info(f"Showing results for closest match: **{match.title()}**")
+                
+                # Create a styled table for the tech stack
+                col1, col2 = st.columns([1, 3])
+                with col1:
+                    st.markdown("**Component**")
+                    for k in tech_stacks[match].keys():
+                        st.markdown(f"**{k}**")
+                with col2:
+                    st.markdown("**Technology**")
+                    for v in tech_stacks[match].values():
+                        st.markdown(f"{v}")
             else:
+                st.warning("No predefined match found – asking AI...")
                 with st.spinner("Getting AI recommendation..."):
                     # Check if user wants raw response
                     if show_raw_response or "raw" in project_type or "json" in project_type or "out of the box" in project_type:
-                        ai_response = get_ai_suggestion(project_type, api_key, return_raw=True)
+                        ai_response = get_ai_suggestion(project_type, st.session_state.api_key, return_raw=True)
                         st.json(ai_response)  # Display as formatted JSON
                     else:
-                        ai_response = get_ai_suggestion(project_type, api_key)
+                        ai_response = get_ai_suggestion(project_type, st.session_state.api_key)
                         st.markdown(ai_response)
+
+# Main app flow control
+if not st.session_state.authenticated:
+    show_auth_popup()
+else:
+    show_main_app()
