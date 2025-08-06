@@ -178,7 +178,7 @@ def show_auth_popup():
                 if api_key_input:
                     st.session_state.api_key = api_key_input
                     st.session_state.authenticated = True
-                    st.experimental_rerun()
+                    st.rerun()  # Fixed: replaced experimental_rerun with rerun
                 else:
                     st.error("Please enter an API key to continue")
 
@@ -201,7 +201,7 @@ def show_main_app():
     st.sidebar.text(f"Current API Key: {masked_key}")
     if st.sidebar.button("Change API Key"):
         st.session_state.authenticated = False
-        st.experimental_rerun()
+        st.rerun()  # Fixed: replaced experimental_rerun with rerun
 
     # Add a toggle for raw response
     st.sidebar.markdown("---")
