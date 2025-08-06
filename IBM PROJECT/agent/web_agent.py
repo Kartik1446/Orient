@@ -4,11 +4,11 @@ import requests
 import os
 from dotenv import load_dotenv
 
-# Load environment variables from .env file
+# Load environment variables from .env file (for other environment variables if needed)
 load_dotenv()
 
-# Load API key from environment
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+# API key will be input by user instead of loaded from environment
+# OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
 tech_stacks = {
     "portfolio website": {
@@ -19,42 +19,76 @@ tech_stacks = {
         "Difficulty": "Beginner"
     },
     "e-commerce website": {
-        "Frontend": "React or Next.js",
-        "Backend": "Node.js + Express",
+        "Frontend": "React with TypeScript",
+        "Backend": "Node.js with Express",
         "Database": "MongoDB",
-        "Hosting": "Vercel or Render",
+        "Hosting": "Vercel",
         "Difficulty": "Intermediate"
     },
-    "chat app (python)": {
-        "Frontend": "Tkinter or PyQt",
-        "Backend": "Flask + Socket.IO",
-        "Database": "SQLite",
-        "Hosting": "PythonAnywhere",
-        "Difficulty": "Beginner"
+    "social media platform": {
+        "Frontend": "React with TypeScript",
+        "Backend": "Node.js with Express",
+        "Database": "MongoDB",
+        "Hosting": "Vercel",
+        "Difficulty": "Intermediate"
     },
-    "blog website": {
-        "Frontend": "React or Next.js",
-        "Backend": "Node.js + Express or Django",
-        "Database": "MongoDB or PostgreSQL",
-        "Hosting": "Vercel or Heroku",
-        "Difficulty": "Beginner to Intermediate"
+    "content management system": {
+        "Frontend": "React with TypeScript",
+        "Backend": "Node.js with Express",
+        "Database": "MongoDB",
+        "Hosting": "Vercel",
+        "Difficulty": "Intermediate"
     },
-    "mobile app": {
-        "Frontend": "React Native or Flutter",
-        "Backend": "Firebase or Node.js",
-        "Database": "Firestore or MongoDB",
-        "Hosting": "Google Play Store / Apple App Store",
+    "mobile application": {
+        "Frontend": "React Native with TypeScript",
+        "Backend": "Node.js with Express",
+        "Database": "MongoDB",
+        "Hosting": "Vercel",
+        "Difficulty": "Intermediate"
+    },
+    "machine learning model": {
+        "Frontend": "React with TypeScript",
+        "Backend": "Node.js with Express",
+        "Database": "MongoDB",
+        "Hosting": "Vercel",
+        "Difficulty": "Intermediate"
+    },
+    "blockchain application": {
+        "Frontend": "React with TypeScript",
+        "Backend": "Node.js with Express",
+        "Database": "MongoDB",
+        "Hosting": "Vercel",
+        "Difficulty": "Intermediate"
+    },
+    "game": {
+        "Frontend": "React with TypeScript",
+        "Backend": "Node.js with Express",
+        "Database": "MongoDB",
+        "Hosting": "Vercel",
+        "Difficulty": "Intermediate"
+    },
+    "chatbot": {
+        "Frontend": "React with TypeScript",
+        "Backend": "Node.js with Express",
+        "Database": "MongoDB",
+        "Hosting": "Vercel",
         "Difficulty": "Intermediate"
     }
+
+
+
+
+
+
 }
 
 def find_closest_match(user_input):
     match, score = process.extractOne(user_input, list(tech_stacks.keys()))
     return match if score > 70 else None
 
-def get_ai_suggestion(prompt: str, return_raw=False) -> str:
-    if not OPENROUTER_API_KEY:
-        return "❌ API key not found. Please set the OPENROUTER_API_KEY in your .env file."
+def get_ai_suggestion(prompt: str, api_key: str, return_raw=False) -> str:
+    if not api_key:
+        return "❌ API key not provided. Please enter your OpenRouter API key in the sidebar."
     
     # For testing purposes, if the prompt contains 'out of the box', return a mock response
     if 'out of the box' in prompt.lower():
@@ -86,7 +120,6 @@ def get_ai_suggestion(prompt: str, return_raw=False) -> str:
         return mock_response["choices"][0]["message"]["content"]
         
     # Ensure proper API key format for OpenRouter
-    api_key = OPENROUTER_API_KEY
     if not api_key.startswith("Bearer "):
         api_key = f"Bearer {api_key}"
         
@@ -141,9 +174,14 @@ st.sidebar.title("Available Project Types")
 for project in tech_stacks.keys():
     st.sidebar.markdown(f"- {project.title()}")
 
+# Add API key input in the sidebar
+st.sidebar.markdown("---")
+st.sidebar.title("API Settings")
+api_key = st.sidebar.text_input("OpenRouter API Key", type="password", help="Enter your OpenRouter API key here. It will not be stored.")
+
 # Add a toggle for raw response
 st.sidebar.markdown("---")
-st.sidebar.title("Settings")
+st.sidebar.title("Display Settings")
 show_raw_response = st.sidebar.checkbox("Show raw API response", False, help="Display the complete JSON response from the API instead of just the content")
 
 query = st.text_input("e.g. portfolio website, chat app (python)")
@@ -182,11 +220,14 @@ if query:
                     st.markdown(f"{v}")
         else:
             st.warning("No predefined match found – asking AI...")
-            with st.spinner("Getting AI recommendation..."):
-                # Check if user wants raw response
-                if show_raw_response or "raw" in project_type or "json" in project_type or "out of the box" in project_type:
-                    ai_response = get_ai_suggestion(project_type, return_raw=True)
-                    st.json(ai_response)  # Display as formatted JSON
-                else:
-                    ai_response = get_ai_suggestion(project_type)
-                    st.markdown(ai_response)
+            if not api_key:
+                st.error("Please enter your OpenRouter API key in the sidebar to use AI suggestions.")
+            else:
+                with st.spinner("Getting AI recommendation..."):
+                    # Check if user wants raw response
+                    if show_raw_response or "raw" in project_type or "json" in project_type or "out of the box" in project_type:
+                        ai_response = get_ai_suggestion(project_type, api_key, return_raw=True)
+                        st.json(ai_response)  # Display as formatted JSON
+                    else:
+                        ai_response = get_ai_suggestion(project_type, api_key)
+                        st.markdown(ai_response)
