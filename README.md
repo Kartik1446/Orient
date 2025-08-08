@@ -66,6 +66,18 @@ This will open a browser window with the web interface.
 
 For other project types, the web version will attempt to provide AI-generated recommendations if an API key is configured.
 
+## Deployment
+
+This application can be deployed to various platforms. See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed instructions.
+
+### Quick Deploy to Streamlit Cloud
+
+1. Push your code to GitHub
+2. Go to [share.streamlit.io](https://share.streamlit.io)
+3. Connect your GitHub repository
+4. Set the main file path to: `web_agent.py`
+5. Deploy!
+
 ## License
 
 MIT
