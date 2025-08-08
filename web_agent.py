@@ -87,6 +87,11 @@ def get_ai_suggestion(prompt: str, api_key: str, return_raw=False) -> str:
     if not api_key:
         return "❌ API key not provided. Please enter your OpenRouter API key in the sidebar."
     
+    # Clean and validate API key
+    api_key = api_key.strip().strip('"').strip("'")
+    if not api_key:
+        return "❌ API key is empty. Please enter a valid OpenRouter API key."
+    
     # For testing purposes, if the prompt contains 'out of the box', return a mock response
     if 'out of the box' in prompt.lower():
         mock_response = {
@@ -115,70 +120,129 @@ def get_ai_suggestion(prompt: str, api_key: str, return_raw=False) -> str:
         if return_raw:
             return mock_response
         return mock_response["choices"][0]["message"]["content"]
-        
-    # Ensure proper API key format for OpenRouter
-    if not api_key.startswith("Bearer "):
-        api_key = f"Bearer {api_key}"
-        
+    
+    # Prepare Authorization header (accept with or without 'Bearer ' prefix)
+    auth_header = api_key
+    if not auth_header.lower().startswith("bearer "):
+        auth_header = f"Bearer {auth_header}"
+    
     headers = {
-        "Authorization": api_key,
+        "Authorization": auth_header,
         "Content-Type": "application/json",
         "HTTP-Referer": "https://orient-techstack-guide.com",
         "X-Title": "Orient TechStack Guide"
     }
+    
     data = {
         "model": "mistralai/mistral-7b-instruct",  # Use a model that's available on OpenRouter
         "messages": [
             {"role": "system", "content": "You are an expert software developer."},
             {"role": "user", "content": f"Suggest a tech stack to build: {prompt}"}
-        ]
+        ],
+        "max_tokens": 500,
+        "temperature": 0.7
     }
     
-    # Debug information
-    print(f"API Key (first 10 chars): {api_key[:10]}...")
+    # Debug information (mask API key in logs)
+    masked_auth = "Bearer " + (api_key[:8] + "..." if len(api_key) > 8 else api_key)
+    safe_headers = {
+        **{k: v for k, v in headers.items() if k != "Authorization"},
+        "Authorization": masked_auth,
+    }
     print(f"Request URL: https://openrouter.ai/api/v1/chat/completions")
-    print(f"Request Headers: {headers}")
+    print(f"Request Headers: {safe_headers}")
     print(f"Request Data: {data}")
     
     try:
         # Use the correct API endpoint
-        response = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=data)
+        response = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=data, timeout=30)
+        
         # Print response status for debugging
         print(f"OpenRouter API Response Status: {response.status_code}")
-        if response.status_code != 200:
+        
+        if response.status_code == 401:
+            error_msg = "❌ Authentication failed. Please check your OpenRouter API key."
+            try:
+                error_data = response.json()
+                if "error" in error_data and "message" in error_data["error"]:
+                    error_msg += f"\n\nError details: {error_data['error']['message']}"
+            except:
+                pass
+            return error_msg
+        elif response.status_code == 403:
+            return "❌ Access forbidden. Please check your OpenRouter API key and account status."
+        elif response.status_code == 429:
+            return "❌ Rate limit exceeded. Please try again later."
+        elif response.status_code != 200:
             print(f"Response content: {response.text}")
-        response.raise_for_status()  # Raise an exception for HTTP errors
+            return f"❌ API error (Status {response.status_code}): {response.text}"
+        
+        response.raise_for_status()  # Raise an exception for other HTTP errors
         result = response.json()
         
         # Return the raw JSON response if requested
         if return_raw:
             return result
             
-        if "choices" in result:
+        if "choices" in result and len(result["choices"]) > 0:
             return result["choices"][0]["message"]["content"]
         elif "error" in result:
-            return f"❌ API error: {result['error'].get('message', result)}"
+            return f"❌ API error: {result['error'].get('message', str(result['error']))}"
         else:
-            return f"⚠️ Unexpected API response: {result}"
+            return f"⚠️ Unexpected API response format: {result}"
+            
+    except requests.exceptions.Timeout:
+        return "❌ Request timeout. Please try again."
+    except requests.exceptions.ConnectionError:
+        return "❌ Connection error. Please check your internet connection."
     except requests.exceptions.RequestException as e:
         return f"❌ Request error: {str(e)}"
+    except Exception as e:
+        return f"❌ Unexpected error: {str(e)}"
 
 # Authentication popup
 def show_auth_popup():
     with st.container():
         st.markdown("### Welcome to Orient TechStack Guide")
         st.markdown("Please enter your OpenRouter API key to continue.")
-        st.markdown("You can get an API key from [OpenRouter](https://openrouter.ai/)")
         
-        api_key_input = st.text_input("OpenRouter API Key", type="password")
+        # Add helpful information about getting API key
+        with st.expander("How to get an OpenRouter API key"):
+            st.markdown("""
+            1. Go to [OpenRouter](https://openrouter.ai/)
+            2. Sign up for a free account
+            3. Navigate to your API keys section
+            4. Create a new API key
+            5. Copy the key and paste it below
+            
+            Paste just the key (e.g., starts with `sk-or-v1-`). Do NOT include `Bearer`.
+            """)
+        
+        api_key_input = st.text_input(
+            "OpenRouter API Key",
+            type="password",
+            help="Paste your OpenRouter API key (starts with 'sk-or-v1-'). Do NOT include 'Bearer'",
+        )
+        
+        # Add validation for API key format (allow with or without Bearer)
+        key_trim = api_key_input.strip()
+        is_valid_format = (
+            key_trim.startswith("sk-or-v1-") or key_trim.lower().startswith("bearer sk-or-v1-")
+        ) if key_trim else False
+        if key_trim and not is_valid_format:
+            st.warning("⚠️ API key should start with 'sk-or-v1-'. Do not include quotes. If you typed 'Bearer', it's okay, but it's not necessary.")
+        
         col1, col2 = st.columns([1, 3])
         
         with col1:
             if st.button("Continue"):
-                if api_key_input:
-                    st.session_state.api_key = api_key_input
-                    st.session_state.authenticated = True
-                    st.rerun()  # Fixed: replaced experimental_rerun with rerun
+                if key_trim:
+                    if not is_valid_format:
+                        st.error("❌ Invalid API key format. Please enter a valid OpenRouter API key.")
+                    else:
+                        st.session_state.api_key = key_trim
+                        st.session_state.authenticated = True
+                        st.rerun()
                 else:
                     st.error("Please enter an API key to continue")
 
@@ -207,6 +271,17 @@ def show_main_app():
     st.sidebar.markdown("---")
     st.sidebar.title("Display Settings")
     show_raw_response = st.sidebar.checkbox("Show raw API response", False, help="Display the complete JSON response from the API instead of just the content")
+    
+    # Add API key test functionality
+    st.sidebar.markdown("---")
+    st.sidebar.title("API Testing")
+    if st.sidebar.button("Test API Key"):
+        with st.spinner("Testing API key..."):
+            test_result = get_ai_suggestion("test", st.session_state.api_key)
+            if "❌" in test_result:
+                st.sidebar.error("API key test failed. Please check your key.")
+            else:
+                st.sidebar.success("✅ API key is working!")
 
     query = st.text_input("e.g. portfolio website, chat app (python)")
 
