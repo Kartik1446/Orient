@@ -1,6 +1,3 @@
-# agent.py
-
-# 1. Define the dictionary of project types and their tech stacks
 tech_stacks = {
     "portfolio website": {
         "Frontend": "HTML/CSS/JavaScript or React",
@@ -39,7 +36,6 @@ tech_stacks = {
     }
 }
 
-# 2. Function to return stack if it exists
 def get_stack(project_type):
     project_type = project_type.lower().strip()
     if project_type in tech_stacks:
@@ -55,7 +51,6 @@ def get_stack(project_type):
             print(f"- {project}")
 
 
-# 3. CLI Interaction Loop
 def main():
     print("🔧 Welcome to TechStack Guide Agent")
     print("Type a project like 'portfolio website', 'e-commerce website', or 'chat app (python)'")
@@ -68,6 +63,5 @@ def main():
             break
         get_stack(user_input)
 
-# 4. Run the main loop
 if __name__ == "__main__":
     main()
